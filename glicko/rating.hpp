@@ -1,14 +1,46 @@
+/*
+*   The MIT License (MIT)
+*
+*   Copyright (c) 2015 Taylor Petrick
+*   Copyright (c) 2024 Kim Jae-hyeon
+*
+*   Permission is hereby granted, free of charge, to any person obtaining a copy
+*   of this software and associated documentation files (the "Software"), to deal
+*   in the Software without restriction, including without limitation the rights
+*   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+*   copies of the Software, and to permit persons to whom the Software is
+*   furnished to do so, subject to the following conditions:
+*
+*   The above copyright notice and this permission notice shall be included in all
+*   copies or substantial portions of the Software.
+*
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+*   SOFTWARE.
+*/
+
 #ifndef GLICKO_RATING_HPP
 #define GLICKO_RATING_HPP
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <iostream>
-
 #include "glicko/config.hpp"
+#include <cstddef>
+#include <ostream>
+
+// Forward declaration
+namespace Glicko { class Rating; }
+
+/// Outputs the rating in Glicko-1 fromat
+std::ostream& operator<<(
+    std::ostream& os,
+    const Glicko::Rating& rating);
 
 namespace Glicko
 {
+
     /// Defines a struct that contains Glicko rating parameters Parameters are
     /// stored in the Glicko-2 rating scale, but can also be queried in in
     /// original Glicko scale.
@@ -17,116 +49,101 @@ namespace Glicko
     public:
         /// Constructs a rating with from a desired rating and deviation.
         /// Defaults to the Glicko-1 standard of R = 1500, RD = 350.
-        Rating(const double rating = Glicko::kDefaultR,
-               const double deviation = Glicko::kDefaultRD,
-               const double volatility = Glicko::kDefaultS);
+        Rating(
+            real_type rating = Glicko::kDefaultR,
+            real_type deviation = Glicko::kDefaultRD,
+            real_type volatility = Glicko::kDefaultS) noexcept;
 
         /// Constructs a rating from another rating instance
-        Rating(const Rating& rating);
+        Rating(
+            const Rating& rating) noexcept;
         
         /// Updates the rating based on a set of games
-        void Update(const int m, const Rating* opponents, const double* score);
+        void Update(
+            std::size_t m, 
+            const Rating* opponents, 
+            const real_type* score);
 
         // Updates the rating based on a single game
-        void Update(const Rating& opponent, const double score);
+        void Update(
+            const Rating& opponent, 
+            real_type score) noexcept;
 
         // Decays the rating deviation
-        void Decay();
+        void Decay() noexcept;
         
         /// Applies the updated ratings
-        void Apply();
+        void Apply() noexcept;
 
         /// Returns the Glicko-1 rating
-        inline double Rating1() const
-        {
-            return (u * Glicko::kScale) + Glicko::kDefaultR;
-        }
+        real_type Rating1() const noexcept;
 
         /// Returns the Glicko-1 deviation
-        inline double Deviation1() const
-        {
-            return p * Glicko::kScale;
-        }
+        real_type Deviation1() const noexcept;
 
         /// Returns the Glicko-2 rating
-        inline double Rating2() const
-        {
-            return u;
-        }
+        real_type Rating2() const noexcept;
 
         /// Returns the Glicko-2 deviation
-        inline double Deviation2() const
-        {
-            return p;
-        }
+        real_type Deviation2() const noexcept;
 
         /// Outputs the rating in Glicko-1 fromat
-        friend inline std::ostream& operator<<(std::ostream& pStream,
-                                               const Rating& pRating)
-        {
-            pStream << "[" << pRating.Rating1()
-                    << ":" << pRating.Deviation1()
-                    << "]";
-            
-            return pStream;
-        }
+        friend std::ostream& (::operator<<)(
+            std::ostream& os,
+            const Rating& rating);
 
     private:
+        void Update(
+            real_type invV,
+            real_type v,
+            real_type dInner,
+            real_type d) noexcept;
+
         /// Computes the value of the g function for a rating
-        inline double G() const
-        {
-            double scale = p / M_PI;
-            return 1.0 / sqrt(1.0 + 3.0 * scale * scale);
-        }
+        real_type G() const noexcept;
 
         /// Computes the value of the e function in terms of a g function value
         /// and another rating
-        inline double E(const double g, const Rating& rating) const
-        {
-            float exponent = -1.0 * g * (rating.u - u);
-            return 1.0 / (1.0 + exp(exponent));
-        }
+        real_type E(
+            real_type g, 
+            const Rating& rating) const noexcept;
 
         /// Computes the value of the f function in terms of x, delta^2, phi^2,
         /// v, a and tau^2.
-        static inline double F(const double x,
-                               const double dS,
-                               const double pS,
-                               const double v,
-                               const double a,
-                               const double tS)
-        {
-            double eX = exp(x);
-            double num = eX * (dS - pS - v - eX);
-            double den = pS + v + eX;
-
-            return (num/ (2.0 * den * den)) - ((x - a)/tS);
-        }
+        static real_type F(
+            real_type x,
+            real_type dS,
+            real_type pS,
+            real_type v,
+            real_type a,
+            real_type tS) noexcept;
 
         /// Performs convergence iteration on the function f
-        static double Convergence(const double d,
-                                  const double v,
-                                  const double p,
-                                  const double s);
+        static real_type Convergence(
+            real_type d,
+            real_type v,
+            real_type p,
+            real_type s) noexcept;
 
         /// The rating u (mu)
-        double u;
+        real_type u;
 
         /// The rating deviation p (phi)
-        double p;
+        real_type p;
 
         /// The rating volatility s (sigma)
-        double s;
+        real_type s;
 
         /// The pending rating value, u'
-        double uPrime;
+        real_type uPrime;
 
-        /// The pending deviation value, u'
-        double pPrime;
+        /// The pending deviation value, p'
+        real_type pPrime;
 
         /// The pending volatility value, s'
-        double sPrime;
+        real_type sPrime;
     };
-}
 
-#endif
+} // namespace Glicko
+
+#endif // GLICKO_RATING_HPP
